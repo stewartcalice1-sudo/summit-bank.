@@ -54,6 +54,66 @@ function accountView(a) {
   return { id:a.id, type:a.type, nickname:a.nickname, accountNumber:`•••• ${a.account_number.slice(-4)}`, status:a.status, currency:a.currency, balance:money(balance), balanceCents:balance };
 }
 
+
+// Investor demonstration opening balances. These are simulated funds.
+function seedOpeningBalances(userId) {
+  const checking = db.prepare(
+    "SELECT * FROM accounts WHERE user_id=? AND type='checking' ORDER BY id LIMIT 1"
+  ).get(userId);
+  const savings = db.prepare(
+    "SELECT * FROM accounts WHERE user_id=? AND type='savings' AND nickname!='Opening Funding Clearing' ORDER BY id LIMIT 1"
+  ).get(userId);
+
+  if (!checking || !savings) return;
+
+  const hasCheckingEntries = db.prepare(
+    "SELECT COUNT(*) n FROM ledger_entries WHERE account_id=?"
+  ).get(checking.id).n;
+  const hasSavingsEntries = db.prepare(
+    "SELECT COUNT(*) n FROM ledger_entries WHERE account_id=?"
+  ).get(savings.id).n;
+
+  if (hasCheckingEntries || hasSavingsEntries) return;
+
+  let clearing = db.prepare(
+    "SELECT * FROM accounts WHERE user_id=? AND nickname='Opening Funding Clearing' LIMIT 1"
+  ).get(userId);
+
+  if (!clearing) {
+    clearing = { id: createAccount(userId, 'savings', 'Opening Funding Clearing') };
+  }
+
+  const fund = db.transaction(() => {
+    post({
+      type: 'opening_demo_funding',
+      description: 'Simulated opening checking balance',
+      actorId: userId,
+      metadata: { simulation: true, purpose: 'investor demonstration' },
+      entries: [
+        { accountId: clearing.id, direction: 'debit', amountCents: 10000000 },
+        { accountId: checking.id, direction: 'credit', amountCents: 10000000 }
+      ]
+    });
+
+    post({
+      type: 'opening_demo_funding',
+      description: 'Simulated opening savings balance',
+      actorId: userId,
+      metadata: { simulation: true, purpose: 'investor demonstration' },
+      entries: [
+        { accountId: clearing.id, direction: 'debit', amountCents: 5000000 },
+        { accountId: savings.id, direction: 'credit', amountCents: 5000000 }
+      ]
+    });
+  });
+
+  fund();
+  notify(userId, 'Opening balances recorded',
+    'Your simulated checking and savings opening balances total $150,000.00.');
+  audit(userId, 'demo.opening_balances.seeded', 'user', userId,
+    { checking: 100000, savings: 50000 });
+}
+
 // Bootstrap administrator from environment on first run.
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@summit.local';
 const adminPassword = process.env.ADMIN_PASSWORD || 'ChangeThisAdminPassword123!';
@@ -61,6 +121,12 @@ if (!db.prepare('SELECT id FROM users WHERE email=?').get(adminEmail)) {
   const hash = bcrypt.hashSync(adminPassword, 12);
   db.prepare("INSERT INTO users(name,email,password_hash,role) VALUES('Summit Administrator',?,?, 'admin')").run(adminEmail,hash);
   console.log(`Initial administrator created: ${adminEmail}. Change its password after first login.`);
+}
+
+
+// One-time seed for existing, previously unfunded customer accounts.
+for (const customer of db.prepare("SELECT id FROM users WHERE role='customer' AND status='active'").all()) {
+  seedOpeningBalances(customer.id);
 }
 
 app.get('/api/health', (_req,res) => res.json({ status:'ok', service:'Summit Bank', mode:'simulated-ledger' }));
@@ -75,6 +141,7 @@ app.post('/api/auth/register', (req,res) => {
       const userId = db.prepare('INSERT INTO users(name,email,phone,password_hash) VALUES(?,?,?,?)').run(input.name,input.email,input.phone,hash).lastInsertRowid;
       createAccount(userId,'checking','Everyday Checking');
       createAccount(userId,'savings','Summit Savings');
+      seedOpeningBalances(userId);
       audit(userId,'customer.registered','user',userId);
       notify(userId,'Welcome to Summit Bank','Your account workspace is ready.');
       return db.prepare('SELECT id,name,email,role FROM users WHERE id=?').get(userId);

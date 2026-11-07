@@ -9,3 +9,46 @@
   font: 800 21px Manrope, sans-serif;
   letter-spacing: -1px;
 }
+
+
+/* Payment confirmation receipt */
+.zelle-confirm-brand {
+  display:flex;
+  align-items:flex-start;
+  margin:0 0 20px;
+  color:#6d1ed4;
+  font-family:Arial,sans-serif;
+  font-size:35px;
+  font-weight:800;
+  letter-spacing:-2px;
+  line-height:1;
+}
+.zelle-confirm-brand sup {
+  font-size:10px;
+  letter-spacing:0;
+  margin:2px 0 0 2px;
+}
+.confirm-details { margin-top:12px; }
+.confirm-line {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:18px;
+  padding:11px 0;
+  border-bottom:1px solid var(--line);
+  font-size:12px;
+}
+.confirm-line span { color:#8c96a4; }
+.confirm-line b {
+  text-align:right;
+  max-width:65%;
+  overflow-wrap:anywhere;
+  font-weight:600;
+}
+.confirm-disclaimer {
+  font-size:9px;
+  line-height:1.5;
+  color:#929baa;
+  margin:16px 0 0;
+}
+.modal-card { max-height:90vh; overflow-y:auto; }

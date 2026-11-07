@@ -1,0 +1,11 @@
+services:
+  summit-bank:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env
+    volumes:
+      - summit-data:/app/data
+    restart: unless-stopped
+volumes:
+  summit-data:
